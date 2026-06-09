@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 
@@ -12,5 +14,7 @@ urlpatterns = [
     path('api/v1/customers/', include('apps.customers.urls')),
     path('api/v1/alerts/', include('apps.alerts.urls')),
     path('api/v1/fx/', include('apps.fx.urls')),
+    # Document ingestion — nested under each org
+    path('api/v1/orgs/<uuid:org_id>/documents/', include('apps.documents.urls')),
     path('webhooks/', include('apps.banking.webhook_urls')),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

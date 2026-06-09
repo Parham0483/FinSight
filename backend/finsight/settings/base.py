@@ -36,7 +36,12 @@ LOCAL_APPS = [
     'apps.customers',
     'apps.alerts',
     'apps.fx',
+    'apps.documents',
 ]
+
+# ── Media (uploaded documents) ───────────────────────────────────────────
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 

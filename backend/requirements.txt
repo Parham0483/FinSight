@@ -37,6 +37,24 @@ gunicorn==23.0.0
 python-decouple==3.8
 django-filter==24.3
 
+# Document ingestion — image preprocessing
+Pillow==11.1.0
+opencv-python-headless==4.11.0.86
+
+# Document ingestion — PDF handling
+pdfplumber==0.11.4
+pdf2image==1.17.0
+
+# Document ingestion — fuzzy matching (customer/vendor name matching)
+rapidfuzz==3.12.1
+
+# Document ingestion — file type detection
+python-magic==0.4.27
+
+# Document storage backends (local default; S3/R2/DigitalOcean via django-storages)
+django-storages==1.14.4
+boto3==1.35.95
+
 # Testing
 pytest==8.3.4
 pytest-django==4.9.0
