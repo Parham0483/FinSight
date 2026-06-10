@@ -1,5 +1,4 @@
 from rest_framework.renderers import JSONRenderer
-import json
 
 
 class EnvelopeRenderer(JSONRenderer):
@@ -42,7 +41,8 @@ class EnvelopeRenderer(JSONRenderer):
                 },
             }
 
-        return json.dumps(envelope).encode()
+        # Serialize via DRF's renderer so UUID/Decimal/datetime are handled.
+        return super().render(envelope, accepted_media_type, renderer_context)
 
 
 def _derive_error_code(data: dict) -> str:
