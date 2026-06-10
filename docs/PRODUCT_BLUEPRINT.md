@@ -181,20 +181,78 @@ RBAC honouring the new accountant role (read+annotate, no money-moving
 config); GDPR export/delete per org; idempotent webhook ingestion;
 `decimal`-only money handling (never float) with currency-aware rounding.
 
-## 7. Build order
+## 7. Differentiation map — what no competitor does
+
+Every incumbent (Agicap, Float, Fathom, Causal, Finmark, QuickBooks/Xero
+planners) shares five assumptions. Each one is an opening:
+
+### 7.1 They assume accounting software → **document-first onboarding**
+Competitors onboard via Xero/QuickBooks integration. The majority of SMEs
+globally — and almost all in emerging markets — run on invoices, bank SMS,
+and spreadsheets. FinSight's 4-tier extraction already means a business can
+**photograph a stack of invoices and have a working forecast** with no
+finance stack at all. Make this the positioning headline: *"forecasting
+for the spreadsheet-and-shoebox majority."* Later extension: a
+WhatsApp/Telegram bot — snap a receipt in chat, the bot confirms the
+extraction. No incumbent can onboard these businesses at all.
+
+### 7.2 They output dashboards → **ask-your-forecast (conversational explainability)**
+Forecasts elsewhere are black-box lines. FinSight's driver attribution
+(§3) becomes an interface: the mascot answers *"why is July risky?"* with
+an answer **grounded in the org's own ledger and forecast decomposition**
+("payroll on the 1st + Acme's invoice will likely arrive 12 days late").
+Strict grounding rule: the LLM narrates retrieved attribution data, never
+computes numbers. This turns the mascot from delight into the product's
+primary interface — and no competitor has an interrogable forecast.
+
+### 7.3 They forecast the expected → **SME stress tests (Cash Resilience Score)**
+Banks stress-test; SMEs never get to. On top of the Monte Carlo engine,
+one-click standardised shocks: top customer churns, all receivables slip
+30 days, 15% FX devaluation, 20% demand dip. Output: survival horizon per
+shock + a single **Cash Resilience Score (0–100)** that trends over time.
+Bank-grade risk methodology brought to a café owner — new to the segment,
+and a master's-thesis topic in itself.
+
+### 7.4 They are West-centric → **regional financial calendar intelligence**
+Seasonality models elsewhere know Christmas. A *global* SME platform must
+know Ramadan and Eid cash patterns, Nowruz, Chinese New Year, Diwali,
+per-country tax deadlines and payday conventions. Implementation is cheap
+(calendar feature library feeding Layer 1 obligations and Layer 3
+features); the differentiation for non-Western markets is enormous.
+
+### 7.5 They keep accuracy private → **the lender-ready pack**
+The accountability loop (§2.3) produces something novel: a *verified
+forecast track record*. Export a financing dossier — cash history, forecast
+bands, and "this platform's 30-day forecasts for this business have been
+within ±X% for N months" — turning forecast credibility into a **portable
+credit signal** for loan applications. Research-adjacent (open-banking
+credit signalling) and a genuine new artefact in the space.
+
+### Designed-for-later (needs user scale, schema designed now)
+Anonymised peer benchmarking: "your DSO is 12 days worse than similar
+agencies." Network-effect moat; ship only with enough orgs and a
+differential-privacy review.
+
+---
+
+## 8. Build order
 
 | Phase | Scope | Proves |
 |---|---|---|
-| **1. Data backbone** | Transactions API, CSV import, categories, synthetic-org generator, tests | end-to-end data flow |
-| **2. Engine v1** | Layer 1+3 (known flows + naive/ETS), quantile bands, runway, dashboard chart | probabilistic forecasting |
+| **1. Data backbone** | Transactions API, CSV import, categories, synthetic-org generator, tests | end-to-end data flow; source-agnostic ingestion wedge (§7.1) |
+| **2. Engine v1** | Layer 1+3 (known flows + naive/ETS), quantile bands, runway, dashboard chart, regional calendar feature library (§7.4) | probabilistic forecasting |
 | **3. Accountability** | ForecastRun scoring job, accuracy display, backtest harness | "verifiably accurate" |
-| **4. Behaviour layer** | recurring detection, payment-behaviour profiles, Monte Carlo assembly | the differentiator |
-| **5. Action layer** | alerts, scenario planning, collections assistant | forecast → decision |
-| **6. Scale-out** | TrueLayer live, multi-currency/FX exposure, AI briefings, maturity v2 scoring | platform completeness |
+| **4. Behaviour layer** | recurring detection, payment-behaviour profiles, Monte Carlo assembly | the core differentiator |
+| **5. Action + risk layer** | alerts, scenario planning, collections assistant, **stress tests + Cash Resilience Score** (§7.3) | forecast → decision |
+| **6. Intelligence layer** | **ask-your-forecast grounded chat** (§7.2), AI briefings, maturity v2 composite scoring | explainability |
+| **7. Reach** | TrueLayer live, multi-currency/FX exposure, **lender-ready pack** (§7.5), WhatsApp/Telegram ingestion bot (§7.1), benchmarking schema | platform completeness |
 
 Tests are written with each phase (TDD, 80% target), not retrofitted.
+Phases 1–4 are the dissertation-grade core; 5–7 are each independently
+demo-able capstones — ship in order, stop anywhere and still have a
+coherent product.
 
-## 8. Resume / master's-application framing
+## 9. Resume / master's-application framing
 
 Every phase yields a concrete claim:
 - "Probabilistic cash-flow engine (Monte Carlo over learned payment-
@@ -203,8 +261,14 @@ Every phase yields a concrete claim:
   average, confidence-routed."
 - "Forecast accountability: automated pinball-loss scoring + calibration
   monitoring of every shipped forecast."
+- "Bank-style stress testing for SMEs: standardised shock library over a
+  Monte Carlo engine, summarised as a Cash Resilience Score."
+- "Grounded conversational explainability: LLM narrates forecast
+  attribution, computes nothing — zero-hallucination by construction."
 - "Multi-tenant Django/DRF with encrypted bank tokens, rotating httpOnly
   JWT, audit logging."
 - Thesis-adjacent topics: SME credit-risk signals from payment behaviour;
-  uncertainty communication in consumer fintech UX (the maturity/mascot
-  system is literally a study in this).
+  verified forecast track records as portable credit signals; uncertainty
+  communication in consumer fintech UX (the maturity/mascot system is
+  literally a study in this); financial inclusion via document-first
+  onboarding in low-formalisation economies.
