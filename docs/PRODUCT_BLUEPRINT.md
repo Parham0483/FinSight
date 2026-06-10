@@ -194,6 +194,27 @@ invoice context, escalating tone sequences. Directly attacks failure mode
 - **Transaction enrichment**: hierarchical category taxonomy; auto-
   categorisation via embeddings/Claude with the same tiered cost discipline
   as extraction; counterparty resolution (normalise "AMZN*MKTP" → Amazon).
+- **Counterparty directory** (extends the existing `customers` app into
+  the general case): every cash flow has a *who*, and the who is what
+  makes a forecast explainable. One Counterparty entity with a system
+  `type` — `customer`, `supplier`, `employee`, `lender`, `tax_authority`,
+  `other` — plus **user-defined tags/groups** on top (e.g. "wholesale
+  clients", "Dubai suppliers", "contractors"). Properties:
+  - Auto-created from ingestion (bank descriptors, invoice parties,
+    accounting-API contacts) and merged by the fuzzy matcher; users can
+    rename, retype, merge, and tag — all corrections audit-logged.
+  - Every transaction links to a counterparty; the dashboard's
+    **categorised inflow/outflow views** roll up by counterparty type,
+    tag, and category: where money actually comes from and goes to, not
+    just an aggregate line.
+  - Type drives behaviour: customers get payment-behaviour profiles and
+    AR aging (§3 Layer 2); suppliers/payees get recurring-obligation
+    detection and AP aging; employees get payroll-pattern detection
+    feeding Layer 1 (with role-gated visibility — payroll detail is
+    owner/admin-only, hidden from the accountant role by default).
+  - Concentration analytics fall out for free: top-customer dependency %
+    feeds the §7.3 stress test ("what if my biggest customer leaves?" is
+    answerable because the data knows who the biggest customer *is*).
 - **Multi-currency**: store original amount+currency and base-currency
   equivalent at transaction-date rate; forecast in base currency; FX
   exposure report (established+) shows sensitivity to rate moves.
@@ -223,6 +244,30 @@ source is untrustworthy. The FX service is therefore built as:
 - **Volatility → stress tests**: realised FX volatility from the log
   calibrates the devaluation shock in §7.3 — Iran-style currency moves are
   simulated from measured history, not invented percentages.
+- **User verification & override**: published rates are shown to the user
+  wherever they bite (transaction conversion, exposure report), and the
+  user can **correct a rate they know to be wrong** — essential in
+  dual-rate economies where the street rate is the real one. Overrides are
+  stored as `rate_type='user_override'` in the FxRateLog with author,
+  timestamp, and the superseded value (never destroying the source data);
+  affected forecasts recompute. Repeated corrections against one provider
+  automatically downweight that provider for that currency.
+
+### 5.2 Human-in-the-loop as a design principle
+
+The FX override rule generalises: **every machine inference in FinSight is
+user-correctable, and every correction is a signal.** Document extractions
+are confirmable field-by-field (already designed), recurring-obligation
+detections require user confirmation before entering the forecast,
+auto-categorisations and counterparty merges can be fixed inline, FX rates
+can be overridden. Three invariants:
+1. corrections are **audit-logged**, never destructive — the machine's
+   original answer is preserved alongside the human's;
+2. corrections **propagate** — dependent forecasts and reports recompute;
+3. corrections **teach** — they feed provider weighting, matcher
+   thresholds, and categorisation hints, so the same mistake fades.
+This is also the honest answer to "how do you trust AI in finance":
+you don't — you verify, and the system is built so verifying is one tap.
 - **CSV import** ships before bank integration polish — fastest path to
   real data and the demo backbone.
 - **Synthetic-org generator** (management command): realistic seasonal SME
@@ -337,7 +382,7 @@ differential-privacy review.
 
 | Phase | Scope | Proves |
 |---|---|---|
-| **1. Data backbone** | Transactions API, `IngestionSource` adapter contract, CSV import, categories, synthetic-org generator, tests | end-to-end data flow; source-agnostic ingestion wedge (§7.1) |
+| **1. Data backbone** | Transactions API, `IngestionSource` adapter contract, CSV import, categories, **counterparty directory (types + tags + rollup views)**, synthetic-org generator, tests | end-to-end data flow; source-agnostic ingestion wedge (§7.1); categorised inflow/outflow views |
 | **2. Engine v1** | Layer 1+3 (known flows + naive/ETS), quantile bands, runway, dashboard chart, regional calendar feature library (§7.4), FX service v1 (two sources, median, logged) | probabilistic forecasting |
 | **3. Accountability** | ForecastRun scoring job (WAPE/MASE/pinball/coverage), accuracy display, backtest harness | "verifiably accurate" (§2.3 methodology) |
 | **4. Behaviour layer** | recurring detection, payment-behaviour profiles, Monte Carlo assembly | the core differentiator |
