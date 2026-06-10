@@ -9,15 +9,29 @@ class Organisation(models.Model):
         ('wholesale', 'Wholesale'),
         ('retail', 'Retail'),
         ('manufacturing', 'Manufacturing'),
-        ('services', 'Services'),
+        ('construction', 'Construction'),
+        ('hospitality', 'Hospitality / Food & Beverage'),
+        ('technology', 'Technology / SaaS'),
+        ('professional_services', 'Professional Services'),
+        ('logistics', 'Logistics / Transport'),
+        ('agriculture', 'Agriculture'),
+        ('healthcare', 'Healthcare'),
+        ('education', 'Education'),
+        ('services', 'Other Services'),
         ('other', 'Other'),
     ]
 
+    # ISO 3166-1 alpha-2 country codes (stored, not constrained — future-proof)
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     industry = models.CharField(max_length=100, choices=INDUSTRY_CHOICES, default='other')
-    base_currency = models.CharField(max_length=3, default='GBP')
-    timezone = models.CharField(max_length=100, default='Europe/London')
+    country_code = models.CharField(max_length=2, default='', blank=True,
+                                    help_text='ISO 3166-1 alpha-2, e.g. GB, US, AE, TR')
+    base_currency = models.CharField(max_length=3, default='USD',
+                                     help_text='ISO 4217 currency code')
+    timezone = models.CharField(max_length=100, default='UTC')
+    locale = models.CharField(max_length=10, default='en',
+                              help_text='BCP 47 locale for number/date formatting, e.g. en-GB, ar-AE')
     is_demo = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -25,7 +39,7 @@ class Organisation(models.Model):
         db_table = 'organisations'
 
     def __str__(self) -> str:
-        return self.name
+        return f'{self.name} ({self.country_code or "—"})'
 
 
 class OrgMembership(models.Model):
@@ -33,6 +47,7 @@ class OrgMembership(models.Model):
         ('owner', 'Owner'),
         ('admin', 'Admin'),
         ('viewer', 'Viewer'),
+        ('accountant', 'Accountant (external)'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
