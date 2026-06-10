@@ -80,14 +80,32 @@ v1 says "forecast accuracy is a core requirement" with no mechanism.
 
 **v2: forecast accountability loop:**
 - Every forecast run is persisted (ForecastRun model already exists).
-- A nightly job scores past runs against actuals once the horizon elapses:
-  MAPE for point forecasts, **pinball loss** for quantiles, plus calibration
-  (did 80% of actuals fall inside the P10–P90 band?).
+- A nightly job scores past runs against actuals once the horizon elapses.
 - Accuracy per horizon is **shown to the user** ("my 30-day forecasts for
   you have been within ±8%") — trust through verification, and the single
   best interview/demo artefact the project can produce.
 - Backtesting harness: replay any org's history, forecasting from each
   historical point — model changes ship only if backtests improve.
+
+**Scoring methodology — peer-reviewed components, not invented ones.**
+The "trusted algorithm" requirement is met by building on the metrics the
+forecasting literature (M4/M5 competitions, Gneiting & Raftery's proper
+scoring rules) has already validated:
+- *Point accuracy*: **WAPE** (primary — robust to near-zero days, unlike
+  plain MAPE) and **MASE** (skill vs a seasonal-naive baseline, so "good"
+  means "beats the dumb model", not just "small number").
+- *Probabilistic accuracy*: **pinball (quantile) loss** per quantile and
+  **CRPS** for the whole distribution — proper scoring rules that cannot
+  be gamed by hedging.
+- *Calibration*: empirical coverage of the P10–P90 band (target 80%) with
+  PIT histograms — detects over/under-confidence separately from error.
+- *Protocol*: rolling-origin (time-series) cross-validation, strict
+  temporal splits, no leakage; scored per horizon and per flow category.
+- The single user-facing number, the **FinSight Accuracy Index**, is a
+  documented, reproducible composite of skill + calibration + sharpness —
+  custom-built (no off-the-shelf composite exists) but from standard,
+  citable parts. The formula ships in the docs; nothing about user-facing
+  accuracy is proprietary magic.
 
 ---
 
@@ -157,16 +175,54 @@ invoice context, escalating tone sequences. Directly attacks failure mode
 
 ## 5. Data architecture completions
 
-- **Unified ingestion**: bank feed (TrueLayer), documents (existing 4-tier
-  extraction), CSV import, manual entry — all normalise into Transaction
-  with `source` + `confidence`; the existing fuzzy-matcher reconciles
-  documents↔transactions, and reconciliation feeds the maturity score.
+- **Unified ingestion behind one adapter interface.** Five source types,
+  all normalising into Transaction with `source` + `confidence`:
+  1. bank feeds (TrueLayer; provider-abstracted for Plaid/Nordigen later),
+  2. **accounting-platform APIs** (Xero, QuickBooks Online, Sage, Zoho
+     Books — OAuth connectors). These are the *richest* source: they carry
+     open invoices and bills with due dates, feeding forecast Layer 1
+     directly, not just historical transactions,
+  3. documents (existing 4-tier extraction),
+  4. CSV import (bank-statement column mapping presets),
+  5. manual entry.
+  An `IngestionSource` adapter contract (connect/sync/normalise/dedupe) is
+  defined in Phase 1 so every source — including connectors built much
+  later — plugs into the same pipeline. The existing fuzzy-matcher
+  reconciles documents↔transactions; cross-source dedup (same txn from
+  bank feed AND accounting API) keys on amount+date+counterparty hashing.
+  Reconciliation feeds the maturity score.
 - **Transaction enrichment**: hierarchical category taxonomy; auto-
   categorisation via embeddings/Claude with the same tiered cost discipline
   as extraction; counterparty resolution (normalise "AMZN*MKTP" → Amazon).
 - **Multi-currency**: store original amount+currency and base-currency
   equivalent at transaction-date rate; forecast in base currency; FX
   exposure report (established+) shows sensitivity to rate moves.
+
+### 5.1 FX data integrity (volatile-currency-grade)
+
+For stable pairs a daily rate is fine; for volatile economies (IRR, and
+episodically TRY, ARS, EGP, NGN…) rates move by the hour and a single
+source is untrustworthy. The FX service is therefore built as:
+- **Multi-source by design**: provider adapters (ExchangeRate-API, Alpha
+  Vantage, ECB reference, others pluggable). Each fetch stores per-source
+  values; the **published rate is the median** of fresh sources.
+- **Divergence detection**: if sources disagree beyond a per-currency
+  threshold, the rate is flagged `disputed`, alerts fire, and forecasts
+  using it widen their uncertainty bands instead of silently picking one.
+- **Append-only FxRateLog**: every published rate records source values,
+  timestamps, method, and which forecasts consumed it — full audit trail
+  from any forecast number back to the rates it used.
+- **Dual-rate currencies**: some economies (Iran is the canonical case)
+  have an official rate and a parallel/market rate that differ massively.
+  Rates carry a `rate_type` (`official` | `market`); the org chooses which
+  governs its books, and the FX exposure report can show both.
+- **Adaptive refresh tiers**: stable pairs refresh daily; currencies whose
+  realised volatility crosses a threshold are promoted to high-frequency
+  refresh automatically (budget-aware: free-tier API quotas are part of
+  the scheduler's maths).
+- **Volatility → stress tests**: realised FX volatility from the log
+  calibrates the devaluation shock in §7.3 — Iran-style currency moves are
+  simulated from measured history, not invented percentages.
 - **CSV import** ships before bank integration polish — fastest path to
   real data and the demo backbone.
 - **Synthetic-org generator** (management command): realistic seasonal SME
@@ -186,24 +242,54 @@ config); GDPR export/delete per org; idempotent webhook ingestion;
 Every incumbent (Agicap, Float, Fathom, Causal, Finmark, QuickBooks/Xero
 planners) shares five assumptions. Each one is an opening:
 
-### 7.1 They assume accounting software → **document-first onboarding**
-Competitors onboard via Xero/QuickBooks integration. The majority of SMEs
+### 7.1 They assume accounting software → **meet every business where it is**
+Competitors onboard *only* via Xero/QuickBooks integration. FinSight
+supports those connectors too (§5 — they're the richest source, carrying
+AR/AP with due dates), but doesn't *require* them: the majority of SMEs
 globally — and almost all in emerging markets — run on invoices, bank SMS,
-and spreadsheets. FinSight's 4-tier extraction already means a business can
+and spreadsheets. FinSight's 4-tier extraction means such a business can
 **photograph a stack of invoices and have a working forecast** with no
-finance stack at all. Make this the positioning headline: *"forecasting
-for the spreadsheet-and-shoebox majority."* Later extension: a
-WhatsApp/Telegram bot — snap a receipt in chat, the bot confirms the
-extraction. No incumbent can onboard these businesses at all.
+finance stack at all. Positioning: *"forecasting for the
+spreadsheet-and-shoebox majority — and parity connectors for everyone
+else."* Later extension: a WhatsApp/Telegram bot — snap a receipt in chat,
+the bot confirms the extraction. Incumbents serve only the
+already-formalised; FinSight's ingestion spectrum serves both.
 
 ### 7.2 They output dashboards → **ask-your-forecast (conversational explainability)**
 Forecasts elsewhere are black-box lines. FinSight's driver attribution
 (§3) becomes an interface: the mascot answers *"why is July risky?"* with
 an answer **grounded in the org's own ledger and forecast decomposition**
 ("payroll on the 1st + Acme's invoice will likely arrive 12 days late").
-Strict grounding rule: the LLM narrates retrieved attribution data, never
-computes numbers. This turns the mascot from delight into the product's
-primary interface — and no competitor has an interrogable forecast.
+This turns the mascot from delight into the product's primary interface —
+and no competitor has an interrogable forecast.
+
+**Anti-hallucination architecture (hard requirement — the mascot must
+never degrade into "regular AI"):**
+1. **Computation/narration split.** A deterministic query layer computes
+   every number (balance projections, attributions, invoice facts) and
+   returns structured JSON. The LLM's only job is verbalising that JSON.
+   It never does arithmetic, never estimates, never fills gaps.
+2. **Tool-use only, closed world.** The model answers exclusively through
+   a fixed toolset (`get_forecast_drivers`, `get_runway`,
+   `get_invoice_status`, `get_balance_on`, …). If no tool returns the
+   needed data, the mascot says so in character ("I don't have enough
+   data on that yet") — a templated refusal path, not a generated guess.
+3. **Number-provenance validation.** Post-generation, a validator extracts
+   every numeric token and date from the reply and checks it appears in
+   the retrieved tool payloads (with formatting tolerance). Any orphan
+   number → the reply is rejected and regenerated; two failures → fall
+   back to a non-LLM templated answer.
+4. **Scope guard.** An intent classifier in front of the chat restricts
+   the surface to the org's finances + product help. Off-topic prompts
+   ("write me a poem") get a charming in-character deflection, never a
+   completion. The mascot has a personality, not general intelligence.
+5. **Source-linked UI.** Every figure in a mascot answer is tappable,
+   opening the underlying transactions/invoices — users can audit any
+   claim in one tap, which also disciplines the design honest.
+6. **Eval suite in CI.** Golden Q&A set per synthetic org, adversarial
+   prompt battery (injection, off-topic, leading questions with wrong
+   premises), and a zero-tolerance hallucination metric: any unprovenanced
+   number in evals fails the build.
 
 ### 7.3 They forecast the expected → **SME stress tests (Cash Resilience Score)**
 Banks stress-test; SMEs never get to. On top of the Monte Carlo engine,
@@ -219,6 +305,18 @@ know Ramadan and Eid cash patterns, Nowruz, Chinese New Year, Diwali,
 per-country tax deadlines and payday conventions. Implementation is cheap
 (calendar feature library feeding Layer 1 obligations and Layer 3
 features); the differentiation for non-Western markets is enormous.
+
+**Footprint-driven, not toggle-driven.** Which calendars apply is derived
+from the org's actual **financial footprint**, never from settings the
+user must maintain: home `country_code` + counterparty countries +
+transaction currencies + bank-account jurisdictions. A UK agency invoicing
+Dubai clients automatically gets UAE holidays and Ramadan payment-timing
+effects applied to *those counterparties'* behaviour profiles — while its
+UK obligations follow HMRC dates. The footprint set updates itself as new
+counterparties appear, surfaces as region chips in the dashboard
+("forecasting across: GB · AE · IR"), and each region's influence is
+visible in driver attribution (§7.2 can answer "why does Ramadan matter
+to my July?").
 
 ### 7.5 They keep accuracy private → **the lender-ready pack**
 The accountability loop (§2.3) produces something novel: a *verified
@@ -239,13 +337,13 @@ differential-privacy review.
 
 | Phase | Scope | Proves |
 |---|---|---|
-| **1. Data backbone** | Transactions API, CSV import, categories, synthetic-org generator, tests | end-to-end data flow; source-agnostic ingestion wedge (§7.1) |
-| **2. Engine v1** | Layer 1+3 (known flows + naive/ETS), quantile bands, runway, dashboard chart, regional calendar feature library (§7.4) | probabilistic forecasting |
-| **3. Accountability** | ForecastRun scoring job, accuracy display, backtest harness | "verifiably accurate" |
+| **1. Data backbone** | Transactions API, `IngestionSource` adapter contract, CSV import, categories, synthetic-org generator, tests | end-to-end data flow; source-agnostic ingestion wedge (§7.1) |
+| **2. Engine v1** | Layer 1+3 (known flows + naive/ETS), quantile bands, runway, dashboard chart, regional calendar feature library (§7.4), FX service v1 (two sources, median, logged) | probabilistic forecasting |
+| **3. Accountability** | ForecastRun scoring job (WAPE/MASE/pinball/coverage), accuracy display, backtest harness | "verifiably accurate" (§2.3 methodology) |
 | **4. Behaviour layer** | recurring detection, payment-behaviour profiles, Monte Carlo assembly | the core differentiator |
-| **5. Action + risk layer** | alerts, scenario planning, collections assistant, **stress tests + Cash Resilience Score** (§7.3) | forecast → decision |
-| **6. Intelligence layer** | **ask-your-forecast grounded chat** (§7.2), AI briefings, maturity v2 composite scoring | explainability |
-| **7. Reach** | TrueLayer live, multi-currency/FX exposure, **lender-ready pack** (§7.5), WhatsApp/Telegram ingestion bot (§7.1), benchmarking schema | platform completeness |
+| **5. Action + risk layer** | alerts, scenario planning, collections assistant, **stress tests + Cash Resilience Score** (§7.3, FX shocks calibrated from FxRateLog volatility) | forecast → decision |
+| **6. Intelligence layer** | **ask-your-forecast grounded chat with anti-hallucination stack** (§7.2), AI briefings, maturity v2 composite scoring | explainability |
+| **7. Reach** | TrueLayer live, **accounting connectors (Xero/QuickBooks first)**, FX service v2 (volatile-currency tiers, dual-rate, disputed-rate handling), **lender-ready pack** (§7.5), WhatsApp/Telegram ingestion bot (§7.1), benchmarking schema | platform completeness |
 
 Tests are written with each phase (TDD, 80% target), not retrofitted.
 Phases 1–4 are the dissertation-grade core; 5–7 are each independently
