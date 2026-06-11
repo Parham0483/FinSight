@@ -8,35 +8,131 @@ import { createOrg, type CreateOrgPayload } from '../../api/organisations'
 const STEPS = ['Welcome', 'Your Business', 'What to Expect'] as const
 type Step = 0 | 1 | 2
 
-// Common country + currency options (top 20 by business volume)
 const COUNTRIES = [
-  { code: 'US', name: 'United States' }, { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },        { code: 'AU', name: 'Australia' },
-  { code: 'DE', name: 'Germany' },       { code: 'FR', name: 'France' },
-  { code: 'JP', name: 'Japan' },         { code: 'CN', name: 'China' },
-  { code: 'IN', name: 'India' },         { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },        { code: 'SG', name: 'Singapore' },
-  { code: 'AE', name: 'UAE' },           { code: 'ZA', name: 'South Africa' },
-  { code: 'NG', name: 'Nigeria' },       { code: 'KE', name: 'Kenya' },
-  { code: 'PK', name: 'Pakistan' },      { code: 'BD', name: 'Bangladesh' },
-  { code: 'PH', name: 'Philippines' },   { code: 'ID', name: 'Indonesia' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'CN', name: 'China' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'IN', name: 'India' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'TW', name: 'Taiwan' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'AE', name: 'UAE' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'KW', name: 'Kuwait' },
+  { code: 'BH', name: 'Bahrain' },
+  { code: 'OM', name: 'Oman' },
+  { code: 'IR', name: 'Iran' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'MA', name: 'Morocco' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'ET', name: 'Ethiopia' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'PE', name: 'Peru' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'LK', name: 'Sri Lanka' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: '', name: 'Other' },
 ]
 
 const CURRENCIES = [
-  { code: 'USD', name: 'US Dollar' },    { code: 'GBP', name: 'British Pound' },
-  { code: 'EUR', name: 'Euro' },         { code: 'CAD', name: 'Canadian Dollar' },
-  { code: 'AUD', name: 'Australian Dollar' }, { code: 'JPY', name: 'Japanese Yen' },
-  { code: 'CNY', name: 'Chinese Yuan' }, { code: 'INR', name: 'Indian Rupee' },
-  { code: 'BRL', name: 'Brazilian Real' }, { code: 'MXN', name: 'Mexican Peso' },
-  { code: 'SGD', name: 'Singapore Dollar' }, { code: 'AED', name: 'UAE Dirham' },
-  { code: 'ZAR', name: 'South African Rand' }, { code: 'NGN', name: 'Nigerian Naira' },
-  { code: 'KES', name: 'Kenyan Shilling' }, { code: 'PKR', name: 'Pakistani Rupee' },
+  { code: 'USD', name: 'US Dollar' },
+  { code: 'EUR', name: 'Euro' },
+  { code: 'GBP', name: 'British Pound' },
+  { code: 'CAD', name: 'Canadian Dollar' },
+  { code: 'AUD', name: 'Australian Dollar' },
+  { code: 'CHF', name: 'Swiss Franc' },
+  { code: 'JPY', name: 'Japanese Yen' },
+  { code: 'CNY', name: 'Chinese Yuan' },
+  { code: 'HKD', name: 'Hong Kong Dollar' },
+  { code: 'SGD', name: 'Singapore Dollar' },
+  { code: 'KRW', name: 'South Korean Won' },
+  { code: 'INR', name: 'Indian Rupee' },
+  { code: 'IDR', name: 'Indonesian Rupiah' },
+  { code: 'MYR', name: 'Malaysian Ringgit' },
+  { code: 'THB', name: 'Thai Baht' },
+  { code: 'PHP', name: 'Philippine Peso' },
+  { code: 'VND', name: 'Vietnamese Dong' },
+  { code: 'AED', name: 'UAE Dirham' },
+  { code: 'SAR', name: 'Saudi Riyal' },
+  { code: 'QAR', name: 'Qatari Riyal' },
+  { code: 'KWD', name: 'Kuwaiti Dinar' },
+  { code: 'BHD', name: 'Bahraini Dinar' },
+  { code: 'OMR', name: 'Omani Rial' },
+  { code: 'IRR', name: 'Iranian Rial' },
+  { code: 'TRY', name: 'Turkish Lira' },
+  { code: 'ILS', name: 'Israeli Shekel' },
+  { code: 'EGP', name: 'Egyptian Pound' },
+  { code: 'MAD', name: 'Moroccan Dirham' },
+  { code: 'NGN', name: 'Nigerian Naira' },
+  { code: 'ZAR', name: 'South African Rand' },
+  { code: 'KES', name: 'Kenyan Shilling' },
+  { code: 'GHS', name: 'Ghanaian Cedi' },
+  { code: 'BRL', name: 'Brazilian Real' },
+  { code: 'MXN', name: 'Mexican Peso' },
+  { code: 'ARS', name: 'Argentine Peso' },
+  { code: 'CLP', name: 'Chilean Peso' },
+  { code: 'COP', name: 'Colombian Peso' },
+  { code: 'PKR', name: 'Pakistani Rupee' },
+  { code: 'BDT', name: 'Bangladeshi Taka' },
+  { code: 'LKR', name: 'Sri Lankan Rupee' },
+  { code: 'NZD', name: 'New Zealand Dollar' },
+  { code: 'RUB', name: 'Russian Ruble' },
+  { code: 'SEK', name: 'Swedish Krona' },
+  { code: 'NOK', name: 'Norwegian Krone' },
+  { code: 'DKK', name: 'Danish Krone' },
+  { code: 'PLN', name: 'Polish Zloty' },
 ]
 
-const INDUSTRIES = [
-  'retail', 'food_beverage', 'professional_services', 'technology',
-  'manufacturing', 'construction', 'healthcare', 'education',
-  'logistics', 'hospitality', 'ecommerce', 'agriculture', 'other',
+// Must match backend INDUSTRY_CHOICES exactly
+const INDUSTRIES: { value: string; label: string }[] = [
+  { value: 'retail',                label: 'Retail' },
+  { value: 'wholesale',             label: 'Wholesale' },
+  { value: 'import_export',         label: 'Import / Export' },
+  { value: 'manufacturing',         label: 'Manufacturing' },
+  { value: 'construction',          label: 'Construction' },
+  { value: 'hospitality',           label: 'Hospitality / Food & Beverage' },
+  { value: 'technology',            label: 'Technology / SaaS' },
+  { value: 'professional_services', label: 'Professional Services' },
+  { value: 'logistics',             label: 'Logistics / Transport' },
+  { value: 'agriculture',           label: 'Agriculture' },
+  { value: 'healthcare',            label: 'Healthcare' },
+  { value: 'education',             label: 'Education' },
+  { value: 'services',              label: 'Other Services' },
+  { value: 'other',                 label: 'Other' },
 ]
 
 const MASCOT_LINES: Record<Step, { text: string; mood: 'happy' | 'idle' | 'celebrating' }> = {
@@ -54,7 +150,7 @@ export default function OnboardingWizard() {
   const [step, setStep] = useState<Step>(0)
   const [form, setForm] = useState<CreateOrgPayload>({
     name: '',
-    industry: 'other',
+    industry: 'retail',
     country_code: 'US',
     base_currency: 'USD',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -267,7 +363,6 @@ function OrgStep({
               {COUNTRIES.map(({ code, name }) => (
                 <option key={code} value={code}>{name}</option>
               ))}
-              <option value="OTHER">Other</option>
             </select>
           </div>
           <div>
@@ -283,10 +378,8 @@ function OrgStep({
         <div>
           <label style={labelStyle}>Industry</label>
           <select className="input" value={form.industry} onChange={(e) => update('industry', e.target.value)} style={{ width: '100%' }}>
-            {INDUSTRIES.map((ind) => (
-              <option key={ind} value={ind}>
-                {ind.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-              </option>
+            {INDUSTRIES.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
             ))}
           </select>
         </div>

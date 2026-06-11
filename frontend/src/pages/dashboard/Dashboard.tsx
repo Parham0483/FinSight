@@ -172,7 +172,7 @@ function StatsGrid({ maturity }: { maturity: NonNullable<ReturnType<typeof useMa
   const stats = [
     { label: 'Days of data', value: maturity?.days_of_data ?? 0, unit: 'days' },
     { label: 'Forecast horizon', value: maturity?.forecast_horizon_days ?? 0, unit: 'days' },
-    { label: 'Capabilities', value: maturity?.capabilities.length ?? 0, unit: 'active' },
+    { label: 'Capabilities', value: maturity?.capabilities?.length ?? 0, unit: 'active' },
   ]
 
   return (
@@ -194,7 +194,7 @@ function StatsGrid({ maturity }: { maturity: NonNullable<ReturnType<typeof useMa
       </div>
 
       {/* Active capabilities */}
-      {maturity && maturity.capabilities.length > 0 && (
+      {maturity && (maturity.capabilities?.length ?? 0) > 0 && (
         <div className="card" style={{ padding: 'var(--space-5)' }}>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
             ACTIVE CAPABILITIES
