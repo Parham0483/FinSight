@@ -110,34 +110,29 @@ def calculate_maturity(org_id: str) -> MaturityProfile:
 
 
 def _count_data_days(org_id: str) -> int:
-    """Count how many days of transaction history exist for this org."""
-    from apps.banking.models import BankAccount
+    """Count how many days of transaction history exist for this org.
+
+    Source-agnostic: every ingestion source normalises into ``Transaction``
+    with a direct ``org`` link, so one query spans bank feeds, CSV imports,
+    documents, and manual entries alike.
+    """
+    from django.db.models import Max, Min
+
     from apps.transactions.models import Transaction
 
-    accounts = BankAccount.objects.filter(
-        connection__org_id=org_id, is_active=True
-    ).values_list('id', flat=True)
-
-    if not accounts:
-        # Also check if they've uploaded documents
-        from apps.documents.models import Document
-        doc_count = Document.objects.filter(
-            org_id=org_id, status='confirmed'
-        ).count()
-        return min(doc_count * 2, 7)  # each confirmed doc = 2 notional days, cap at 7
-
-    result = Transaction.objects.filter(
-        account_id__in=accounts
-    ).aggregate(
-        earliest=__import__('django.db.models', fromlist=['Min']).Min('timestamp'),
-        latest=__import__('django.db.models', fromlist=['Max']).Max('timestamp'),
+    result = Transaction.objects.filter(org_id=org_id).aggregate(
+        earliest=Min('timestamp'),
+        latest=Max('timestamp'),
     )
 
     earliest = result.get('earliest')
     latest = result.get('latest')
 
     if earliest is None or latest is None:
-        return 0
+        # No transactions yet — fall back to confirmed documents as a weak signal.
+        from apps.documents.models import Document
+        doc_count = Document.objects.filter(org_id=org_id, status='confirmed').count()
+        return min(doc_count * 2, 7)  # each confirmed doc = 2 notional days, cap at 7
 
     return max(0, (latest.date() - earliest.date()).days + 1)
 

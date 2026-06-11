@@ -31,6 +31,7 @@ LOCAL_APPS = [
     'apps.organisations',
     'apps.banking',
     'apps.categories',
+    'apps.counterparties',
     'apps.transactions',
     'apps.forecasting',
     'apps.insights',
