@@ -37,8 +37,4 @@ app.conf.beat_schedule = {
         'task': 'apps.banking.tasks.check_consent_expiry',
         'schedule': crontab(minute=0, hour=9),
     },
-    'update-customer-risk-scores': {
-        'task': 'apps.customers.tasks.update_all_risk_scores',
-        'schedule': crontab(minute=0, hour=6),
-    },
 }

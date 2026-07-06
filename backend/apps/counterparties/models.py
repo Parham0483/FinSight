@@ -7,24 +7,32 @@ from django.db import models
 from apps.organisations.models import Organisation
 
 
+# Card-network / processor noise words that carry no identity of the party.
+_PROCESSOR_STOP_WORDS = frozenset({
+    'pos', 'crd', 'card', 'payment', 'pmt', 'ref', 'txn',
+    'visa', 'mastercard', 'paypal',
+})
+
+
 def normalise_name(raw: str) -> str:
     """Collapse a counterparty descriptor to a comparable canonical key.
 
     Bank/accounting descriptors are noisy ("AMZN*MKTP UK*1A2B3", "AMAZON.CO.UK").
-    We strip card-processor noise, punctuation, and case so that obvious
-    variants resolve to the same key for auto-merge and dedup. This is a cheap
-    deterministic pre-pass; the fuzzy matcher (§5) does the harder cases.
+    We tokenise on non-alphanumerics (so ``*``, ``#`` and ``.`` are separators,
+    not truncation points), then drop processor noise words and any token that
+    contains a digit (reference ids like ``1A2B3`` / ``1234567``). This is a
+    cheap deterministic pre-pass; the fuzzy matcher (§5) handles harder cases.
     """
     if not raw:
         return ''
-    text = raw.lower()
-    # Drop common card-network / processor prefixes and trailing reference ids.
-    text = re.sub(r'\b(pos|crd|card|payment|pmt|ref|txn|visa|mastercard|paypal)\b', ' ', text)
-    text = re.sub(r'[*#].*$', ' ', text)          # everything after a * or # is usually a ref
-    text = re.sub(r'[^a-z0-9 ]+', ' ', text)       # punctuation → space
-    text = re.sub(r'\b\d{4,}\b', ' ', text)        # long digit runs are reference numbers
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
+    tokens = re.split(r'[^a-z0-9]+', raw.lower())
+    kept = [
+        token for token in tokens
+        if token
+        and token not in _PROCESSOR_STOP_WORDS
+        and not any(char.isdigit() for char in token)
+    ]
+    return ' '.join(kept)
 
 
 class Counterparty(models.Model):
@@ -100,3 +108,57 @@ class Counterparty(models.Model):
         if not self.normalised_name:
             self.normalised_name = normalise_name(self.name)
         super().save(*args, **kwargs)
+
+
+class Invoice(models.Model):
+    """An AR invoice against a customer-type Counterparty.
+
+    Relocated from the retired `customers` app once Counterparty absorbed
+    Customer (see `customers` migrations 0002-0005 and `0002_invoice` here).
+    Not enforced at the DB level, but `counterparty` is expected to have
+    ``type == Counterparty.TYPE_CUSTOMER`` — Django can't express a FK
+    constrained to another table's column value, so this is a code
+    convention checked in `clean()`.
+    """
+
+    STATUS_CHOICES = [
+        ('unpaid', 'Unpaid'),
+        ('partial', 'Partially Paid'),
+        ('paid', 'Paid'),
+        ('overdue', 'Overdue'),
+        ('written_off', 'Written Off'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name='invoices')
+    counterparty = models.ForeignKey(
+        Counterparty, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices'
+    )
+    reference = models.CharField(max_length=100, blank=True)
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    currency = models.CharField(max_length=3, default='GBP')
+    issue_date = models.DateField()
+    due_date = models.DateField()
+    paid_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='unpaid')
+    matched_transaction = models.ForeignKey(
+        'transactions.Transaction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='matched_invoices'
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'invoices'
+        indexes = [
+            models.Index(fields=['status', 'due_date'], name='invoices_status_73cf28_idx'),
+            models.Index(fields=['counterparty'], name='invoices_counterparty_idx'),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.reference or self.id} — {self.counterparty} £{self.amount}'
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.counterparty_id and self.counterparty.type != Counterparty.TYPE_CUSTOMER:
+            raise ValidationError('Invoice.counterparty must be a customer-type Counterparty.')

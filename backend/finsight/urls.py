@@ -13,7 +13,6 @@ urlpatterns = [
     path('api/v1/counterparties/', include('apps.counterparties.urls')),
     path('api/v1/forecast/', include('apps.forecasting.urls')),
     path('api/v1/insights/', include('apps.insights.urls')),
-    path('api/v1/customers/', include('apps.customers.urls')),
     path('api/v1/alerts/', include('apps.alerts.urls')),
     path('api/v1/fx/', include('apps.fx.urls')),
     # Document ingestion — nested under each org

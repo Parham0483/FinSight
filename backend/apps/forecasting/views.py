@@ -14,6 +14,8 @@ class ForecastMaturityView(APIView):
         profile = calculate_maturity(str(org_id))
         return Response({
             'stage': profile.stage,
+            'score': profile.score,
+            'component_scores': profile.component_scores,
             'days_of_data': profile.days_of_data,
             'forecast_horizon_days': profile.forecast_horizon_days,
             'progress_to_next': profile.progress_to_next,

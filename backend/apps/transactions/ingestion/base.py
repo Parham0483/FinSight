@@ -18,6 +18,7 @@ from typing import Any, Iterable
 from django.db import transaction as db_transaction
 
 from apps.categories.models import Category
+from apps.categories.services import suggest_category
 from apps.counterparties.models import Counterparty
 from apps.counterparties.services import resolve_counterparty
 from apps.organisations.models import Organisation
@@ -140,6 +141,11 @@ class IngestionSource(ABC):
             )
 
         category = category_by_slug.get(norm.category_slug) if norm.category_slug else None
+        if category is None:
+            # Source didn't supply a category — try the rule-before-LLM ladder.
+            # Never marked as `category_overridden`: that flag is reserved for
+            # a human's explicit correction, not a machine guess.
+            category = suggest_category(self.org, counterparty, norm.description, norm.amount)
 
         with db_transaction.atomic():
             txn = Transaction(

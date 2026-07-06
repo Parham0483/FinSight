@@ -2,7 +2,7 @@
 Fuzzy matching service — links extracted document data to existing records.
 
 After extraction, we try to find:
-  - Matching Customer (by vendor/payee name)
+  - Matching Counterparty (by vendor/payee name — any type: customer, supplier, etc.)
   - Duplicate document (same amount + date + reference already exists)
   - Suggested category for transactions
 
@@ -18,15 +18,15 @@ from rapidfuzz import fuzz, process
 
 logger = logging.getLogger(__name__)
 
-CUSTOMER_MATCH_THRESHOLD = 75   # 0–100; above this = confident match
+COUNTERPARTY_MATCH_THRESHOLD = 75   # 0–100; above this = confident match
 DUPLICATE_AMOUNT_TOLERANCE = 0.01  # 1% difference = possible duplicate
 
 
 @dataclass(frozen=True)
 class MatchSuggestion:
-    customer_id: Optional[str] = None
-    customer_name: Optional[str] = None
-    customer_match_score: float = 0.0
+    counterparty_id: Optional[str] = None
+    counterparty_name: Optional[str] = None
+    counterparty_match_score: float = 0.0
     is_likely_duplicate: bool = False
     duplicate_document_id: Optional[str] = None
     suggested_category: str = 'other'
@@ -39,12 +39,12 @@ def find_matches(
     document_type: str,
 ) -> MatchSuggestion:
     """
-    Given extracted document data, find matching Customer records
+    Given extracted document data, find matching Counterparty records
     and check for potential duplicates.
     """
     warnings: list[str] = []
-    customer_id = None
-    customer_name = None
+    counterparty_id = None
+    counterparty_name = None
     match_score = 0.0
     is_duplicate = False
     duplicate_id = None
@@ -53,12 +53,12 @@ def find_matches(
     amount = _get_amount(extracted_data)
     ref = _get_reference(extracted_data, document_type)
 
-    # Try to match vendor name to existing customers
+    # Try to match vendor/payee name to the org's counterparty directory
     if vendor_name:
-        customer_id, customer_name, match_score = _match_customer(org_id, vendor_name)
-        if match_score < CUSTOMER_MATCH_THRESHOLD:
-            customer_id = None  # below threshold — don't suggest
-            customer_name = None
+        counterparty_id, counterparty_name, match_score = _match_counterparty(org_id, vendor_name)
+        if match_score < COUNTERPARTY_MATCH_THRESHOLD:
+            counterparty_id = None  # below threshold — don't suggest
+            counterparty_name = None
 
     # Check for duplicate documents
     if amount and ref:
@@ -72,9 +72,9 @@ def find_matches(
     suggested_category = _suggest_category(document_type, vendor_name or '', extracted_data)
 
     return MatchSuggestion(
-        customer_id=customer_id,
-        customer_name=customer_name,
-        customer_match_score=match_score,
+        counterparty_id=counterparty_id,
+        counterparty_name=counterparty_name,
+        counterparty_match_score=match_score,
         is_likely_duplicate=is_duplicate,
         duplicate_document_id=duplicate_id,
         suggested_category=suggested_category,
@@ -114,21 +114,24 @@ def _get_reference(data: dict, document_type: str) -> str:
     return ''
 
 
-def _match_customer(org_id: str, vendor_name: str) -> tuple[Optional[str], Optional[str], float]:
+def _match_counterparty(org_id: str, vendor_name: str) -> tuple[Optional[str], Optional[str], float]:
     """
-    Fuzzy match vendor_name against Customer.name in this org.
-    Returns (customer_id, customer_name, score).
+    Fuzzy match vendor_name against Counterparty.name in this org, across all
+    types (invoice vendors are customers, but PO/receipt/cheque parties are
+    typically suppliers — restricting to one type would silently break those).
+    Soft-merged entries are excluded so suggestions always point at a live
+    survivor. Returns (counterparty_id, counterparty_name, score).
     """
-    from apps.customers.models import Customer
+    from apps.counterparties.models import Counterparty
 
-    customers = list(
-        Customer.objects.filter(org_id=org_id)
+    counterparties = list(
+        Counterparty.objects.filter(org_id=org_id, merged_into__isnull=True)
         .values('id', 'name')
     )
-    if not customers:
+    if not counterparties:
         return None, None, 0.0
 
-    names = [c['name'] for c in customers]
+    names = [c['name'] for c in counterparties]
     result = process.extractOne(
         vendor_name,
         names,
@@ -138,10 +141,10 @@ def _match_customer(org_id: str, vendor_name: str) -> tuple[Optional[str], Optio
         return None, None, 0.0
 
     matched_name, score, idx = result
-    customer_id = str(customers[idx]['id'])
-    logger.debug('Customer match: "%s" → "%s" (score=%d)', vendor_name, matched_name, score)
+    counterparty_id = str(counterparties[idx]['id'])
+    logger.debug('Counterparty match: "%s" → "%s" (score=%d)', vendor_name, matched_name, score)
 
-    return customer_id, matched_name, float(score)
+    return counterparty_id, matched_name, float(score)
 
 
 def _check_duplicate(

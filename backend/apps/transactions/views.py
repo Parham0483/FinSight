@@ -4,6 +4,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.categories.services import record_correction
 from core.pagination import StandardPagination
 from core.permissions import require_org_param
 
@@ -111,9 +112,13 @@ class TransactionDetailView(APIView):
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = TransactionSerializer(txn, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        # A manual category change is a human correction (§5.2) — record it.
-        if 'category' in serializer.validated_data:
+        # A manual category change is a human correction (§5.2) — record it,
+        # and feed it back into the rule-promotion ladder so repeated
+        # corrections for the same counterparty become a deterministic rule.
+        corrected_category = serializer.validated_data.get('category')
+        if corrected_category is not None:
             serializer.validated_data['category_overridden'] = True
+            record_correction(txn.org, txn.counterparty, corrected_category)
         serializer.save()
         return Response(serializer.data)
 

@@ -55,9 +55,9 @@ def process_document(self, document_id: str) -> dict:
         extracted_with_matches = {
             **extraction.data,
             '_match': {
-                'customer_id': match.customer_id,
-                'customer_name': match.customer_name,
-                'customer_match_score': match.customer_match_score,
+                'counterparty_id': match.counterparty_id,
+                'counterparty_name': match.counterparty_name,
+                'counterparty_match_score': match.counterparty_match_score,
                 'is_likely_duplicate': match.is_likely_duplicate,
                 'duplicate_document_id': match.duplicate_document_id,
                 'suggested_category': match.suggested_category,
