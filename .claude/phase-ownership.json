@@ -1,0 +1,66 @@
+{
+  "_comment": "Derived from PHASE1_COORDINATION.md collision-avoidance map + PHASE_DIRECTIVE.md build order. Verified against actual repo structure on 2026-07-05: phase-1's owns paths all exist on `main` except backend/apps/counterparties/, which exists only in the separate git worktree at .claude/worktrees/phase-1-data-backbone (branch worktree-phase-1-data-backbone) — that worktree now has its own mirrored .claude/ bundle (hooks, agents, skills, this file) so enforcement applies there too, since that is where phase-1 work actually happens. Phase 2-5 paths are NOT all placeholders: fx/, alerts/, and insights/ already exist on main with real models; only scorecards/ and the forecasting/{engine,accuracy,backtest,behaviour,montecarlo}/ submodules are genuinely not yet created. Re-verify at the start of each new phase's worktree.",
+
+  "active_phase": "phase-1-data-backbone",
+
+  "phases": {
+    "phase-1-data-backbone": {
+      "owns": [
+        "backend/apps/transactions/",
+        "backend/apps/counterparties/",
+        "backend/apps/categories/",
+        "backend/apps/forecasting/maturity.py",
+        "backend/finsight/settings/base.py",
+        "backend/finsight/urls.py",
+        "backend/finsight/celery.py",
+        "backend/core/permissions.py",
+        "backend/core/renderers.py",
+        "backend/conftest.py",
+        "backend/pytest.ini",
+        "backend/finsight/settings/test.py"
+      ]
+    },
+    "phase-2-engine-v1": {
+      "owns": [
+        "backend/apps/forecasting/engine/",
+        "backend/apps/fx/",
+        "frontend/src/pages/dashboard/",
+        "frontend/src/api/forecasting.ts"
+      ]
+    },
+    "phase-3-accountability": {
+      "owns": [
+        "backend/apps/forecasting/accuracy/",
+        "backend/apps/forecasting/backtest/"
+      ]
+    },
+    "phase-4-behaviour": {
+      "owns": [
+        "backend/apps/forecasting/behaviour/",
+        "backend/apps/forecasting/montecarlo/"
+      ]
+    },
+    "phase-5-action-risk": {
+      "owns": [
+        "backend/apps/alerts/",
+        "backend/apps/insights/",
+        "backend/apps/scorecards/"
+      ]
+    }
+  },
+
+  "shared_coordinate_before_edit": [
+    "backend/apps/customers/",
+    "backend/apps/documents/services/matching.py",
+    "backend/apps/authentication/",
+    "backend/apps/banking/",
+    "backend/apps/organisations/"
+  ],
+
+  "always_confirm_with_human": [
+    "backend/finsight/settings/",
+    "**/migrations/*_initial.py",
+    ".claude/settings.json",
+    ".claude/phase-ownership.json"
+  ]
+}

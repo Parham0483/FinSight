@@ -59,7 +59,7 @@ class Document(models.Model):
     # Links to created records after confirmation
     created_invoice_id = models.UUIDField(null=True, blank=True)
     created_transaction_id = models.UUIDField(null=True, blank=True)
-    created_customer_id = models.UUIDField(null=True, blank=True)
+    created_counterparty_id = models.UUIDField(null=True, blank=True)
 
     # Review notes from user
     review_notes = models.TextField(blank=True)

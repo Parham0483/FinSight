@@ -51,7 +51,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'extracted_data', 'confirmed_data', 'review_notes',
             'line_items', 'match_info',
             'uploaded_at', 'processed_at', 'confirmed_at',
-            'created_invoice_id', 'created_transaction_id', 'created_customer_id',
+            'created_invoice_id', 'created_transaction_id', 'created_counterparty_id',
         )
         read_only_fields = (
             'id', 'status', 'processing_tier_used', 'tokens_used', 'confidence_score',
@@ -70,7 +70,7 @@ class DocumentConfirmSerializer(serializers.Serializer):
     review_notes = serializers.CharField(allow_blank=True, default='')
     create_invoice = serializers.BooleanField(default=False)
     create_transaction = serializers.BooleanField(default=False)
-    create_customer = serializers.BooleanField(default=False)
+    create_counterparty = serializers.BooleanField(default=False)
 
 
 class StorageSettingsSerializer(serializers.ModelSerializer):

@@ -59,3 +59,38 @@ class Category(models.Model):
         if self.parent_id:
             return f'{self.parent.name} / {self.name}'
         return self.name
+
+
+class CategorisationRule(models.Model):
+    """A learned counterparty -> category mapping, checked before any LLM call.
+
+    Rule promotion per the correction ladder (blueprint §5.2 / money-handling
+    invariant 3): a single correction only tracks `hit_count`; the rule isn't
+    used to auto-categorise until it has been reinforced (`hit_count >= 2`),
+    so one-off corrections don't calcify into a rule prematurely. A
+    contradicting correction resets the counter rather than averaging —
+    the most recent human judgement wins.
+    """
+
+    PROMOTION_THRESHOLD = 2
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name='categorisation_rules')
+    counterparty = models.ForeignKey(
+        'counterparties.Counterparty', on_delete=models.CASCADE, related_name='categorisation_rules'
+    )
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='rules')
+    hit_count = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'categorisation_rules'
+        unique_together = ('org', 'counterparty')
+
+    def __str__(self) -> str:
+        return f'{self.counterparty} → {self.category} (×{self.hit_count})'
+
+    @property
+    def is_promoted(self) -> bool:
+        return self.hit_count >= self.PROMOTION_THRESHOLD

@@ -10,9 +10,9 @@ urlpatterns = [
     path('api/v1/banking/', include('apps.banking.urls')),
     path('api/v1/transactions/', include('apps.transactions.urls')),
     path('api/v1/categories/', include('apps.categories.urls')),
+    path('api/v1/counterparties/', include('apps.counterparties.urls')),
     path('api/v1/forecast/', include('apps.forecasting.urls')),
     path('api/v1/insights/', include('apps.insights.urls')),
-    path('api/v1/customers/', include('apps.customers.urls')),
     path('api/v1/alerts/', include('apps.alerts.urls')),
     path('api/v1/fx/', include('apps.fx.urls')),
     # Document ingestion — nested under each org

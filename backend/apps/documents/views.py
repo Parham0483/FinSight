@@ -142,7 +142,7 @@ class DocumentConfirmView(APIView):
     """
     POST /orgs/{org_id}/documents/{doc_id}/confirm/
     User reviews extracted data, confirms (with optional corrections),
-    and optionally creates Invoice/Transaction/Customer records.
+    and optionally creates Invoice/Transaction/Counterparty records.
     """
 
     def post(self, request: Request, org_id: str, doc_id: str) -> Response:
@@ -165,15 +165,15 @@ class DocumentConfirmView(APIView):
         confirmed_data = data['confirmed_data']
         created_invoice_id = None
         created_transaction_id = None
-        created_customer_id = None
+        created_counterparty_id = None
 
         # Optionally create records from confirmed data
-        if data['create_customer']:
-            created_customer_id = _create_customer(org, confirmed_data, doc.document_type)
+        if data['create_counterparty']:
+            created_counterparty_id = _create_counterparty(org, confirmed_data, doc.document_type)
 
         if data['create_invoice'] and doc.document_type in ('invoice', 'purchase_order'):
             created_invoice_id = _create_invoice(
-                org, confirmed_data, doc.document_type, created_customer_id
+                org, confirmed_data, doc.document_type, created_counterparty_id
             )
 
         Document.objects.filter(id=doc_id).update(
@@ -183,7 +183,7 @@ class DocumentConfirmView(APIView):
             confirmed_at=timezone.now(),
             created_invoice_id=created_invoice_id,
             created_transaction_id=created_transaction_id,
-            created_customer_id=created_customer_id,
+            created_counterparty_id=created_counterparty_id,
         )
 
         doc.refresh_from_db()
@@ -295,9 +295,16 @@ class StorageSettingsView(APIView):
 # ── Helper functions for record creation ─────────────────────────────────
 
 
-def _create_customer(org, confirmed_data: dict, doc_type: str) -> str | None:
-    """Create a Customer record from extracted vendor/payee name."""
-    from apps.customers.models import Customer
+def _create_counterparty(org, confirmed_data: dict, doc_type: str) -> str | None:
+    """Resolve/create a customer-type Counterparty from extracted vendor/payee name.
+
+    Uses `resolve_counterparty` (not a bare `get_or_create`) so this goes
+    through the same canonical-key dedup as ingestion — a user confirming a
+    document doesn't create a second directory entry for a party that
+    already exists under a slightly different raw name.
+    """
+    from apps.counterparties.models import Counterparty
+    from apps.counterparties.services import resolve_counterparty
 
     name = (
         confirmed_data.get('vendor_name')
@@ -310,21 +317,22 @@ def _create_customer(org, confirmed_data: dict, doc_type: str) -> str | None:
     if not name:
         return None
 
-    customer, _ = Customer.objects.get_or_create(
-        org=org,
-        name=name,
-        defaults={
-            'email': confirmed_data.get('vendor_email', ''),
-            'payment_terms_days': 30,
-        },
-    )
-    return str(customer.id)
+    counterparty = resolve_counterparty(org, name, default_type=Counterparty.TYPE_CUSTOMER)
+    if counterparty is None:
+        return None
+
+    email = confirmed_data.get('vendor_email', '')
+    if email and not counterparty.email:
+        counterparty.email = email
+        counterparty.save(update_fields=['email'])
+
+    return str(counterparty.id)
 
 
-def _create_invoice(org, confirmed_data: dict, doc_type: str, customer_id: str | None) -> str | None:
+def _create_invoice(org, confirmed_data: dict, doc_type: str, counterparty_id: str | None) -> str | None:
     """Create an Invoice record from confirmed invoice/PO data."""
     from datetime import date
-    from apps.customers.models import Invoice, Customer
+    from apps.counterparties.models import Counterparty, Invoice
 
     total = confirmed_data.get('total_amount')
     if not total:
@@ -339,11 +347,14 @@ def _create_invoice(org, confirmed_data: dict, doc_type: str, customer_id: str |
         except (ValueError, TypeError):
             return date.today()
 
-    customer = Customer.objects.filter(id=customer_id, org=org).first() if customer_id else None
+    counterparty = (
+        Counterparty.objects.filter(id=counterparty_id, org=org, type=Counterparty.TYPE_CUSTOMER).first()
+        if counterparty_id else None
+    )
 
     invoice = Invoice.objects.create(
         org=org,
-        customer=customer,
+        counterparty=counterparty,
         reference=confirmed_data.get('invoice_number') or confirmed_data.get('po_number') or '',
         amount=total,
         currency=confirmed_data.get('currency', 'GBP'),
