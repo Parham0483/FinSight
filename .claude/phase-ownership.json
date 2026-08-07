@@ -1,12 +1,28 @@
 {
-  "_comment": "Derived from PHASE1_COORDINATION.md collision-avoidance map + PHASE_DIRECTIVE.md build order. Verified against actual repo structure on 2026-07-05: phase-1's owns paths all exist on `main` except backend/apps/counterparties/, which exists only in the separate git worktree at .claude/worktrees/phase-1-data-backbone (branch worktree-phase-1-data-backbone) — that worktree now has its own mirrored .claude/ bundle (hooks, agents, skills, this file) so enforcement applies there too, since that is where phase-1 work actually happens. Phase 2-5 paths are NOT all placeholders: fx/, alerts/, and insights/ already exist on main with real models; only scorecards/ and the forecasting/{engine,accuracy,backtest,behaviour,montecarlo}/ submodules are genuinely not yet created. Re-verify at the start of each new phase's worktree.",
+  "_comment": "Derived from PHASE1_COORDINATION.md collision-avoidance map + PHASE_DIRECTIVE.md build order. Verified against actual repo structure on 2026-07-05: phase-1's owns paths all exist on `main` except backend/apps/counterparties/, which exists only in the separate git worktree at .claude/worktrees/phase-1-data-backbone (branch worktree-phase-1-data-backbone) — that worktree now has its own mirrored .claude/ bundle (hooks, agents, skills, this file) so enforcement applies there too, since that is where phase-1 work actually happens. Phase 2-5 paths are NOT all placeholders: fx/, alerts/, and insights/ already exist on main with real models; only scorecards/ and the forecasting/{engine,accuracy,backtest,behaviour,montecarlo}/ submodules are genuinely not yet created. Re-verify at the start of each new phase's worktree. Addendum (2026-07-15): the original map only listed phase-1's single-file carve-out (forecasting/maturity.py) and phase-2's new submodule (forecasting/engine/), and missed that forecasting/models.py and forecasting/migrations/ are shared app-level files neither phase actually owns outright — engine/'s new models (Bill, RecurringObligation) had to be imported into forecasting/models.py and their migration generated into forecasting/migrations/ for Django to pick them up under the existing 'forecasting' app label (registering engine/ as its own Django app would have required editing backend/finsight/settings/base.py, which sits in always_confirm_with_human — avoided instead). Both paths are now claimed explicitly by phase-2-engine-v1 below, since that's where the edit actually happened; re-check this pairing (models.py + migrations/) doesn't silently drift back to someone else's phase as accuracy/backtest/behaviour/montecarlo submodules get built the same way. Addendum (2026-07-15, second): discovered a real flaw in phase-boundary-check.sh's matching logic while carving out backend/apps/transactions/management/commands/generate_synthetic_org.py for phase-2 (needed a learning-stage preset for Layer 3 demos). The hook resolves ownership by taking the FIRST matching phase in this file's JSON key order (jq `to_entries[] | select(...) | .key` piped to `head -1`), not the most specific matching prefix — confirmed empirically: adding the file to phase-2-engine-v1's owns list while leaving phase-1-data-backbone's blanket 'backend/apps/transactions/' prefix in place still resolved to phase-1 and blocked the edit, because phase-1-data-backbone is declared first in the phases object and its broader prefix also matched. The only reliable fix given this first-match-wins behaviour is to eliminate the overlap entirely — phase-1's blanket transactions/ directory claim below has been expanded into an explicit per-file/subdirectory list that excludes generate_synthetic_org.py, rather than trying to make a more specific phase-2 entry 'win' by any ordering trick. Any future single-file carve-out from inside another phase's directory-prefix claim must do the same (narrow the owning phase's list, don't just add an overlapping entry to the requesting phase) until/unless phase-boundary-check.sh itself is rewritten to pick the longest matching prefix instead of the first-declared one — that hook-logic fix has not been made and is out of scope here unless asked for separately. Addendum (2026-08-07, third): same narrow-then-carve-out pattern applied to backend/apps/transactions/ingestion/csv_import.py — needed multilingual/fuzzy CSV column-header detection so real downloaded test data (varying bank export layouts, non-English headers) imports without a manual column_map every time. phase-1's blanket 'ingestion/' claim was expanded into explicit files (__init__.py, base.py, manual.py stay phase-1's; csv_import.py carved to phase-2). New tests for the auto-detection logic live in a brand-new file test_csv_auto_detect.py (also claimed by phase-2) rather than editing phase-1's existing test_ingestion.py, which was left untouched — verified beforehand that every existing CSV test in test_ingestion.py passes an explicit preset= or column_map=, so the new auto-detect-only-when-neither-given behaviour doesn't change their outcomes, and the one existing error-message regex test (test_missing_date_column_raises_on_sync) was preserved by keeping the old exact wording pattern in the explicit-column_map validation path.",
 
-  "active_phase": "phase-1-data-backbone",
+  "active_phase": "phase-2-engine-v1",
 
   "phases": {
     "phase-1-data-backbone": {
       "owns": [
-        "backend/apps/transactions/",
+        "backend/apps/transactions/__init__.py",
+        "backend/apps/transactions/admin.py",
+        "backend/apps/transactions/apps.py",
+        "backend/apps/transactions/ingestion/__init__.py",
+        "backend/apps/transactions/ingestion/base.py",
+        "backend/apps/transactions/ingestion/manual.py",
+        "backend/apps/transactions/management/__init__.py",
+        "backend/apps/transactions/management/commands/__init__.py",
+        "backend/apps/transactions/migrations/",
+        "backend/apps/transactions/models.py",
+        "backend/apps/transactions/rollup.py",
+        "backend/apps/transactions/serializers.py",
+        "backend/apps/transactions/tests/__init__.py",
+        "backend/apps/transactions/tests/test_ingestion.py",
+        "backend/apps/transactions/tests/test_models.py",
+        "backend/apps/transactions/urls.py",
+        "backend/apps/transactions/views.py",
         "backend/apps/counterparties/",
         "backend/apps/categories/",
         "backend/apps/forecasting/maturity.py",
@@ -23,7 +39,13 @@
     "phase-2-engine-v1": {
       "owns": [
         "backend/apps/forecasting/engine/",
+        "backend/apps/forecasting/models.py",
+        "backend/apps/forecasting/migrations/",
         "backend/apps/fx/",
+        "backend/apps/transactions/management/commands/generate_synthetic_org.py",
+        "backend/apps/transactions/tests/test_generate_synthetic_org.py",
+        "backend/apps/transactions/ingestion/csv_import.py",
+        "backend/apps/transactions/tests/test_csv_auto_detect.py",
         "frontend/src/pages/dashboard/",
         "frontend/src/api/forecasting.ts"
       ]
