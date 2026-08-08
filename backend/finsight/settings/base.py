@@ -31,9 +31,13 @@ LOCAL_APPS = [
     'apps.organisations',
     'apps.banking',
     'apps.categories',
+    'apps.counterparties',
     'apps.transactions',
     'apps.forecasting',
     'apps.insights',
+    # Retired: Customer/Invoice absorbed into apps.counterparties. Kept registered
+    # with no models of its own solely so its migration history stays valid — see
+    # apps/customers/migrations/0002-0006 and apps/counterparties/migrations/0002.
     'apps.customers',
     'apps.alerts',
     'apps.fx',

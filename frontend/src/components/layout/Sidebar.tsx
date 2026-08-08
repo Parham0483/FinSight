@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useMascot } from '../../store/mascotContext'
 import { useAuth } from '../../store/authContext'
-import { STAGE_COLORS } from '../../store/mascotContext'
+import { STAGE_COLORS, STAGE_LABELS } from '../../store/mascotContext'
 
 const NAV_ITEMS = [
   { path: '/dashboard',     label: 'Dashboard',     icon: '◈', capability: null },
@@ -60,7 +60,7 @@ export default function Sidebar() {
       </div>
 
       {/* Maturity indicator */}
-      {maturity && (
+      {maturity?.stage && (
         <div style={{
           margin: '0 var(--space-4) var(--space-4)',
           padding: 'var(--space-3)',
@@ -71,13 +71,13 @@ export default function Sidebar() {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
             <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Intelligence</span>
             <span style={{ fontSize: '11px', color: STAGE_COLORS[maturity.stage], fontWeight: 600 }}>
-              {maturity.stage.charAt(0).toUpperCase() + maturity.stage.slice(1)}
+              {STAGE_LABELS[maturity.stage]}
             </span>
           </div>
           <div style={{ background: 'var(--color-border)', borderRadius: '9999px', height: 4 }}>
             <div style={{
               background: STAGE_COLORS[maturity.stage],
-              width: `${maturity.progress_to_next * 100}%`,
+              width: `${(maturity.progress_to_next ?? 0) * 100}%`,
               height: '100%',
               borderRadius: '9999px',
               transition: 'width 0.4s ease',

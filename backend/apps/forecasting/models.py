@@ -2,6 +2,11 @@ import uuid
 from django.db import models
 from apps.organisations.models import Organisation
 
+# Layer 1 models live in engine/models.py for file organisation; imported here so
+# Django registers them under the 'forecasting' app label and picks them up in
+# migrations. See engine/models.py docstring for why they aren't in counterparties/.
+from .engine.models import Bill, RecurringObligation  # noqa: F401
+
 
 class ForecastRun(models.Model):
     STATUS_CHOICES = [

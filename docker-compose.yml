@@ -95,7 +95,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     volumes:
-      - frontend_build:/app/dist
+      - frontend_build:/dist
     env_file: .env
 
   nginx:

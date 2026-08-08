@@ -26,9 +26,9 @@ client.interceptors.response.use(
         queue.forEach((cb) => cb())
         queue = []
         return client(original)
-      } catch {
+      } catch (refreshError) {
         queue = []
-        window.location.href = '/login'
+        return Promise.reject(refreshError)
       } finally {
         refreshing = false
       }

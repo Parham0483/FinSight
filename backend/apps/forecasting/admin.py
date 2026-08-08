@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ForecastDataPoint, ForecastRun, ForecastScenario
+from .models import Bill, ForecastDataPoint, ForecastRun, ForecastScenario, RecurringObligation
 
 @admin.register(ForecastRun)
 class ForecastRunAdmin(admin.ModelAdmin):
@@ -16,3 +16,16 @@ class ForecastDataPointAdmin(admin.ModelAdmin):
 class ForecastScenarioAdmin(admin.ModelAdmin):
     list_display = ('org', 'name', 'created_at')
     search_fields = ('org__name', 'name')
+
+@admin.register(Bill)
+class BillAdmin(admin.ModelAdmin):
+    list_display = ('org', 'counterparty', 'amount', 'currency', 'due_date', 'status')
+    list_filter = ('status', 'currency')
+    date_hierarchy = 'due_date'
+    search_fields = ('reference', 'counterparty__name')
+
+@admin.register(RecurringObligation)
+class RecurringObligationAdmin(admin.ModelAdmin):
+    list_display = ('org', 'kind', 'amount', 'currency', 'frequency', 'is_active', 'source')
+    list_filter = ('kind', 'frequency', 'is_active', 'source')
+    search_fields = ('description', 'counterparty__name')
