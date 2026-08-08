@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../store/authContext'
 import { useMascot, STAGE_COLORS, STAGE_LABELS } from '../../store/mascotContext'
+import CombinedForecastChart from './CombinedForecastChart'
 
 export default function Dashboard() {
   const { org } = useAuth()
@@ -41,6 +42,14 @@ export default function Dashboard() {
       {/* Maturity card */}
       {maturity && (
         <MaturityCard maturity={maturity} />
+      )}
+
+      {/* Combined Layer 1 + Layer 3 balance projection — only once the org has
+          enough data to be past 'new' (a brand-new org has no transactions to
+          project from at all; GettingStartedPanel is the right thing to show
+          there instead). */}
+      {org && maturity && maturity.stage !== 'new' && (
+        <CombinedForecastChart orgId={org.id} />
       )}
 
       {/* Stage-aware content */}

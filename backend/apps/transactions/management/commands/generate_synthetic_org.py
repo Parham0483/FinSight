@@ -76,7 +76,35 @@ PROFILES: dict[str, dict] = {
         'customers': ['Amazon Marketplace', 'Shopify Storefront', 'Etsy Channel', 'Wholesale B2B'],
         'suppliers': ['Shenzhen Manufacturing', 'PrintLabel Co', 'ShipFast Logistics', 'Packaging Plus'],
     },
+    # A genuinely early-stage org, not just artificially sparse test data: a solo
+    # consultant a couple of months in, who logs transactions in occasional batches
+    # rather than daily and has been behind on bookkeeping for the last month —
+    # a realistic, common pattern for a brand-new one-person business, not an
+    # abandoned one. Uses a dedicated generation path (`learning_preset`) instead
+    # of the daily seasonal-revenue model the other profiles use, because that
+    # model's very act of transacting every day makes calculate_maturity's
+    # coverage-density + reconciliation-exemption + recency components float the
+    # score into 'developing' within the first week or two regardless of how few
+    # total days are requested — confirmed empirically, not assumed. The
+    # transaction count (4) and window (34 active days + 32 quiet days) below are
+    # calibration constants tuned against the real calculate_maturity formula to
+    # land reliably in the 'learning' bucket (score ~20-22 of the 5-25 range, with
+    # margin) — they are not meant to scale with --days, which this profile ignores.
+    'solo_trader': {
+        'name': 'Fresh Start Consulting',
+        'industry': 'professional_services',
+        'currency': 'GBP',
+        'country': 'GB',
+        'learning_preset': True,
+        'customers': ['First Referral Client', 'Word-of-Mouth Customer'],
+        'suppliers': ['Accounting Software Subscription'],
+    },
 }
+
+# Calibration constants for the 'solo_trader' learning_preset — see PROFILES comment above.
+_LEARNING_PRESET_TRANSACTION_COUNT = 4
+_LEARNING_PRESET_ACTIVE_SPAN_DAYS = 34
+_LEARNING_PRESET_QUIET_GAP_DAYS = 32
 
 _TWO_DP = Decimal('0.01')
 
@@ -108,14 +136,26 @@ class Command(BaseCommand):
             categories = {c.slug: c for c in Category.objects.filter(org=org)}
             customers, suppliers, employee, landlord, tax_authority = self._create_counterparties(org, profile)
 
-            created = self._generate_transactions(
-                org, profile, days, rng, categories,
-                customers, suppliers, employee, landlord, tax_authority,
-            )
+            if profile.get('learning_preset'):
+                created = self._generate_learning_preset_transactions(
+                    org, rng, customers, suppliers,
+                )
+            else:
+                created = self._generate_transactions(
+                    org, profile, days, rng, categories,
+                    customers, suppliers, employee, landlord, tax_authority,
+                )
 
+        if profile.get('learning_preset'):
+            span_note = (
+                f'{_LEARNING_PRESET_ACTIVE_SPAN_DAYS + _LEARNING_PRESET_QUIET_GAP_DAYS} days '
+                f'(fixed calibration window — --days is ignored for this profile)'
+            )
+        else:
+            span_note = f'{days} days'
         self.stdout.write(self.style.SUCCESS(
             f'Created synthetic org "{org.name}" ({org.id}) with {created} transactions '
-            f'over {days} days [profile={profile_key}].'
+            f'over {span_note} [profile={profile_key}].'
         ))
 
     def _create_org(self, profile: dict, name_override: str | None) -> Organisation:
@@ -218,6 +258,52 @@ class Command(BaseCommand):
                 ))
 
         # Persisting one-by-one runs the save() hook (dedup hash); fine for fixtures.
+        for txn in batch:
+            txn.save()
+        return len(batch)
+
+    def _generate_learning_preset_transactions(
+        self, org, rng, customers, suppliers,
+    ) -> int:
+        """See the 'solo_trader' PROFILES entry for why this is a separate, deliberately
+        sparse generation path rather than a low-volume pass through the daily model.
+
+        Deliberately uncategorised (category=None): calculate_maturity's categorisation_rate
+        component alone contributes 15 of the 100 score points at 100% categorised, which —
+        combined with the fixed source_reliability/reconciliation floor every manual-only,
+        no-invoice org gets — already exceeds the 'learning' stage's score ceiling (25) on
+        its own. A brand-new user who hasn't gotten around to categorising every transaction
+        yet is realistic, not a workaround; confirmed this is what actually keeps the
+        calibration in the 'learning' bucket, not just an assumption.
+        """
+        currency = 'GBP'
+
+        span = _LEARNING_PRESET_ACTIVE_SPAN_DAYS
+        count = _LEARNING_PRESET_TRANSACTION_COUNT
+        gap = _LEARNING_PRESET_QUIET_GAP_DAYS
+        offsets = [round(i * (span - 1) / (count - 1)) for i in range(count)]
+
+        batch: list[Transaction] = []
+        for i, offset in enumerate(offsets):
+            days_ago = gap + (span - 1 - offset)
+            timestamp = (timezone.now() - timedelta(days=days_ago)).replace(
+                hour=14, minute=0, second=0, microsecond=0,
+            )
+            if i % 2 == 0:
+                customer = rng.choice(customers)
+                amount = _money(Decimal(str(rng.uniform(150, 400))))
+                batch.append(self._txn(
+                    org, currency, timestamp, amount, None, customer,
+                    f'Client payment — {customer.name}', Transaction.SOURCE_MANUAL,
+                ))
+            else:
+                supplier = rng.choice(suppliers)
+                amount = -_money(Decimal(str(rng.uniform(20, 60))))
+                batch.append(self._txn(
+                    org, currency, timestamp, amount, None, supplier,
+                    f'Supplier — {supplier.name}', Transaction.SOURCE_MANUAL,
+                ))
+
         for txn in batch:
             txn.save()
         return len(batch)
