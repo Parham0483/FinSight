@@ -33,6 +33,30 @@ export interface MaturityProfile {
   next_milestone_label: string
 }
 
+export interface DailyBalancePoint {
+  date: string
+  known_net: string
+  statistical_p10: string
+  statistical_p50: string
+  statistical_p90: string
+  balance_p10: string
+  balance_p50: string
+  balance_p90: string
+  drivers: Record<string, string>
+}
+
+export interface CombinedForecast {
+  starting_balance: string
+  horizon_days: number
+  statistical_method: string | null
+  points: DailyBalancePoint[]
+  runway: {
+    most_likely_cashout_date: string | null
+    worst_case_cashout_date: string | null
+  }
+  driver_totals: Record<string, string>
+}
+
 export interface ApiResponse<T> {
   success: boolean
   data: T

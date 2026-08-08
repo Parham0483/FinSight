@@ -43,7 +43,7 @@ export function MascotProvider({ children }: { children: React.ReactNode }) {
     if (!org) return
     try {
       const res = await getMaturity(org.id)
-      const profile = res.data
+      const profile = res.data.data
       setMaturity(profile)
       setMood(profile.mascot_mood as MascotMood)
     } catch {

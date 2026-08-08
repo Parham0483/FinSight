@@ -72,6 +72,7 @@ class DailyBalancePoint:
     balance_p50: Decimal          # cumulative projected balance, most likely
     balance_p90: Decimal          # cumulative projected balance, optimistic
     drivers: dict = field(default_factory=dict)  # source_type -> Decimal contribution
+    statistical_method: str | None = None  # Layer 3 method used that day, or None if no forecast
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,7 @@ def build_combined_daily_balance(
             statistical_p10=s10, statistical_p50=s50, statistical_p90=s90,
             balance_p10=balance_p10, balance_p50=running_p50, balance_p90=balance_p90,
             drivers=drivers,
+            statistical_method=stat_point.method if stat_point else None,
         ))
     return tuple(points)
 
